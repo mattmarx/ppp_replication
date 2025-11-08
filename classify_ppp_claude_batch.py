@@ -176,7 +176,11 @@ Patent ID: {patent_id}"""
 
             try:
                 magid = int(row['magid'])
-                patent_id = int(row['patent_id'])
+                # Handle both numeric and non-numeric patent IDs (e.g., reissue patents like 'RE47740')
+                try:
+                    patent_id = int(row['patent_id'])
+                except (ValueError, TypeError):
+                    patent_id = row['patent_id']
                 papertitle = str(row['papertitle'])
                 patent_title = str(row['patent_title'])
                 paper_abstract = str(row['paper_abstract'])
@@ -231,8 +235,7 @@ Patent ID: {patent_id}"""
 
         # Submit batch
         batch = self.client.beta.messages.batches.create(
-            requests=messages,
-            betas=["batch-2024-09-24"]
+            requests=messages
         )
 
         batch_id = batch.id
@@ -263,8 +266,7 @@ Patent ID: {patent_id}"""
     def check_batch_status(self, batch_id):
         """Check the status of a batch job."""
         batch = self.client.beta.messages.batches.retrieve(
-            batch_id,
-            betas=["batch-2024-09-24"]
+            batch_id
         )
         return batch
 
@@ -307,8 +309,7 @@ Patent ID: {patent_id}"""
 
         # Stream results from batch
         with self.client.beta.messages.batches.results(
-            batch_id,
-            betas=["batch-2024-09-24"]
+            batch_id
         ) as results_iter:
             for result in results_iter:
                 try:
@@ -405,7 +406,11 @@ Patent ID: {patent_id}"""
 
                 try:
                     magid = int(row['magid'])
-                    patent_id = int(row['patent_id'])
+                    # Handle both numeric and non-numeric patent IDs (e.g., reissue patents like 'RE47740')
+                    try:
+                        patent_id = int(row['patent_id'])
+                    except (ValueError, TypeError):
+                        patent_id = row['patent_id']
                     papertitle = str(row['papertitle'])
                     patent_title = str(row['patent_title'])
                     paper_abstract = str(row['paper_abstract'])
@@ -536,7 +541,11 @@ Patent ID: {patent_id}"""
             async with semaphore:
                 try:
                     magid = int(row['magid'])
-                    patent_id = int(row['patent_id'])
+                    # Handle both numeric and non-numeric patent IDs (e.g., reissue patents like 'RE47740')
+                    try:
+                        patent_id = int(row['patent_id'])
+                    except (ValueError, TypeError):
+                        patent_id = row['patent_id']
                     papertitle = str(row['papertitle'])
                     patent_title = str(row['patent_title'])
                     paper_abstract = str(row['paper_abstract'])
