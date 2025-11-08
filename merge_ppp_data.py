@@ -6,7 +6,7 @@ import argparse
 def main():
     # Parse command-line arguments
     parser = argparse.ArgumentParser(
-        description='Merge PPP data with paper abstracts'
+        description='Merge PPP data with paper and patent information from embeddings TSV files'
     )
     parser.add_argument('input', nargs='?', help='Input CSV file to merge (or use default paths)')
     parser.add_argument('--output', '-o', help='Output filename (default: finalpppsplusabstract[score].csv)')
@@ -17,7 +17,9 @@ def main():
 
     # Define base paths
     base_dir = "/mnt/d/Marx Dropbox/Matt Marx/research/anticommonsrevisited/handcheck/llmcheck/"
-    tsv_path = "/mnt/d/Marx Dropbox/Matt Marx/bigdata/ppp/mattrewriteofemma/data/int/papertoembed.tsv"
+    data_int_dir = "/mnt/d/Marx Dropbox/Matt Marx/bigdata/ppp/mattrewriteofemma/data/int/"
+    paper_tsv_path = os.path.join(data_int_dir, "papertoembed.tsv")
+    patent_tsv_path = os.path.join(data_int_dir, "patenttoembed.tsv")
 
     # Set output path in data/int/
     output_dir = "/mnt/d/Marx Dropbox/Matt Marx/bigdata/ppp/mattrewriteofemma/data/int/"
@@ -81,21 +83,36 @@ def main():
         elif df2 is not None:
             print("  Warning: ppp_score column not found in CSV2")
 
-    # Load the TSV file with paper abstracts
-    print("Loading TSV file with paper abstracts...")
-    paper_abstracts = pd.read_csv(tsv_path, sep='\t')
-    paper_abstracts = paper_abstracts[['id', 'abstract']].copy()
-    paper_abstracts.rename(columns={'id': 'magid', 'abstract': 'paper_abstract'}, inplace=True)
+    # Load the TSV files with paper and patent data
+    print("Loading TSV files...")
+
+    print(f"  Loading paper data from {paper_tsv_path}...")
+    paper_data = pd.read_csv(paper_tsv_path, sep='\t', low_memory=False)
+    # Extract paper information: id, abstract, and title
+    paper_cols = [col for col in ['id', 'abstract', 'title'] if col in paper_data.columns]
+    paper_data = paper_data[paper_cols].copy()
+    paper_data.rename(columns={'id': 'magid', 'abstract': 'paper_abstract', 'title': 'papertitle'}, inplace=True)
+    print(f"    Paper data columns: {paper_data.columns.tolist()}")
+
+    print(f"  Loading patent data from {patent_tsv_path}...")
+    patent_data = pd.read_csv(patent_tsv_path, sep='\t', low_memory=False)
+    # Extract patent information: id, title, abstract
+    patent_cols = [col for col in ['id', 'title', 'abstract'] if col in patent_data.columns]
+    patent_data = patent_data[patent_cols].copy()
+    patent_data.rename(columns={'id': 'patent_id', 'title': 'patent_title', 'abstract': 'patent_abstract'}, inplace=True)
+    print(f"    Patent data columns: {patent_data.columns.tolist()}")
 
     # Process File 1
     print("\nProcessing File 1...")
-    df1_merged = df1.merge(paper_abstracts, on='magid', how='left')
+    df1_merged = df1.merge(paper_data, on='magid', how='left')
+    df1_merged = df1_merged.merge(patent_data, on='patent_id', how='left')
     print(f"File 1 rows: {len(df1_merged)}")
 
     # Process File 2 if provided
     if df2 is not None:
         print("Processing File 2...")
-        df2_merged = df2.merge(paper_abstracts, on='magid', how='left')
+        df2_merged = df2.merge(paper_data, on='magid', how='left')
+        df2_merged = df2_merged.merge(patent_data, on='patent_id', how='left')
         print(f"File 2 rows: {len(df2_merged)}")
 
         # Combine both files
