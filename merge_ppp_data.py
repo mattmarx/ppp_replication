@@ -9,7 +9,7 @@ def main():
         description='Merge PPP data with paper abstracts'
     )
     parser.add_argument('input', nargs='?', help='Input CSV file to merge (or use default paths)')
-    parser.add_argument('--output', '-o', help='Output filename (default: merged_ppp_data.csv)')
+    parser.add_argument('--output', '-o', help='Output filename (default: finalpppsplusabstract[score].csv)')
     parser.add_argument('--second-input', help='Second CSV file to merge (optional)')
     parser.add_argument('--ppp-score', type=int, help='Filter to keep only rows with this ppp_score value (applied before merge)')
 
@@ -21,7 +21,15 @@ def main():
 
     # Set output path in data/int/
     output_dir = "/mnt/d/Marx Dropbox/Matt Marx/bigdata/ppp/mattrewriteofemma/data/int/"
-    output_filename = args.output or "merged_ppp_data.csv"
+
+    # Generate default output filename based on ppp_score if provided
+    if args.output:
+        output_filename = args.output
+    elif args.ppp_score is not None:
+        output_filename = f"finalpppsplusabstract{args.ppp_score}.csv"
+    else:
+        output_filename = "finalpppsplusabstract.csv"
+
     output_path = os.path.join(output_dir, output_filename)
 
     # Ensure output directory exists
