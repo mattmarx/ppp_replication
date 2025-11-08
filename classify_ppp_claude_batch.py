@@ -181,7 +181,7 @@ Patent ID: {patent_id}"""
                 patent_title = str(row['patent_title'])
                 paper_abstract = str(row['paper_abstract'])
                 patent_abstract = str(row['patent_abstract'])
-                original_response = str(row['response'])
+                original_response = str(row.get('response', ''))
 
                 message_content = self._build_message_content(
                     prompt, magid, patent_id, papertitle, patent_title,
@@ -410,7 +410,7 @@ Patent ID: {patent_id}"""
                     patent_title = str(row['patent_title'])
                     paper_abstract = str(row['paper_abstract'])
                     patent_abstract = str(row['patent_abstract'])
-                    original_response = str(row['response'])
+                    original_response = str(row.get('response', ''))
 
                     row_number = idx + 2  # Account for header
                     logger.info(f"Processing row {row_number}/{len(df)} (magid: {magid}, patent_id: {patent_id})")
@@ -541,7 +541,7 @@ Patent ID: {patent_id}"""
                     patent_title = str(row['patent_title'])
                     paper_abstract = str(row['paper_abstract'])
                     patent_abstract = str(row['patent_abstract'])
-                    original_response = str(row['response'])
+                    original_response = str(row.get('response', ''))
 
                     message_content = self._build_message_content(
                         prompt, magid, patent_id, papertitle, patent_title,
