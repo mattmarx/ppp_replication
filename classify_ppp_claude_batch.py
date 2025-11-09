@@ -277,6 +277,7 @@ Patent Information:
         Retrieve results from completed batch.
         Saves results to CSV file.
         """
+        start_time = time.time()
         logger.info(f"Retrieving batch {batch_id}...")
 
         # Get batch info
@@ -309,6 +310,8 @@ Patent Information:
 
         row_mapping = batch_info.get('row_mapping', {})
         results = []
+        input_tokens = 0
+        output_tokens = 0
 
         # Stream results from batch
         results_iter = self.client.beta.messages.batches.results(batch_id)
@@ -326,6 +329,10 @@ Patent Information:
                         row_data.get('original_response')
                     )
                     results.append(parsed)
+                    # Track token usage
+                    if hasattr(result.result, 'message') and hasattr(result.result.message, 'usage'):
+                        input_tokens += result.result.message.usage.input_tokens
+                        output_tokens += result.result.message.usage.output_tokens
                 elif result.result.type == "errored":
                     error_msg = result.result.error.message if result.result.error else "Unknown error"
                     results.append({
@@ -353,15 +360,26 @@ Patent Information:
             logger.info(f"Results saved to {output_file}")
             logger.info(f"Total results: {len(results)}")
 
+            # Calculate cost and elapsed time
+            total_cost = self._calculate_cost(input_tokens, output_tokens)
+            elapsed_time = time.time() - start_time
+
             # Update batch tracking
             batch_info['status'] = 'completed'
             batch_info['output_file'] = output_file
             batch_info['completed_at'] = datetime.now().isoformat()
             batch_info['results_count'] = len(results)
+            batch_info['input_tokens'] = input_tokens
+            batch_info['output_tokens'] = output_tokens
+            batch_info['total_cost'] = total_cost
             self._save_batch_tracking()
 
             print(f"\n✓ Results retrieved: {output_file}")
             print(f"  Total results: {len(results)}")
+            print(f"  Input tokens: {input_tokens:,}")
+            print(f"  Output tokens: {output_tokens:,}")
+            print(f"  Total cost: ${total_cost:.4f}")
+            print(f"  Processing time: {elapsed_time:.2f}s")
             return output_file
         else:
             logger.warning("No results found in batch")
