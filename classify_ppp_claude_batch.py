@@ -293,7 +293,8 @@ Patent ID: {patent_id}"""
         logger.info(f"Batch status: {batch.processing_status}")
         logger.info(f"Request counts: {batch.request_counts}")
 
-        if batch.processing_status != "completed":
+        # Batch API returns "ended" when complete (not "completed")
+        if batch.processing_status != "ended":
             logger.warning(f"Batch not yet complete. Current status: {batch.processing_status}")
             logger.info(f"Check again later with: python classify_ppp_claude_batch.py --mode batch-retrieve --batch-id {batch_id}")
             return None
