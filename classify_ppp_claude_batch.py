@@ -99,7 +99,7 @@ class PPPBatchClassifier:
     def _build_message_content(self, prompt, magid, patent_id, papertitle,
                               patent_title, paper_abstract, patent_abstract, original_response):
         """Build the message content for classification."""
-        return f"""{prompt}
+        message = f"""{prompt}
 
 Paper Information:
 - Title: {papertitle}
@@ -108,11 +108,13 @@ Paper Information:
 Patent Information:
 - Patent ID: {patent_id}
 - Title: {patent_title}
-- Abstract: {patent_abstract}
+- Abstract: {patent_abstract}"""
 
-Original Response: {original_response}
-Paper ID (magid): {magid}
-Patent ID: {patent_id}"""
+        # Only include original response if it's not empty
+        if original_response and original_response.strip():
+            message += f"\n\nOriginal Response: {original_response}"
+
+        return message
 
     def _parse_response(self, response_text, magid, patent_id, original_response):
         """Parse JSON response from Claude."""
