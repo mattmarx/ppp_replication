@@ -309,42 +309,40 @@ Patent ID: {patent_id}"""
         results = []
 
         # Stream results from batch
-        with self.client.beta.messages.batches.results(
-            batch_id
-        ) as results_iter:
-            for result in results_iter:
-                try:
-                    custom_id = result.custom_id
-                    row_data = row_mapping.get(custom_id, {})
+        results_iter = self.client.beta.messages.batches.results(batch_id)
+        for result in results_iter:
+            try:
+                custom_id = result.custom_id
+                row_data = row_mapping.get(custom_id, {})
 
-                    if result.result.type == "succeeded":
-                        response_text = result.result.message.content[0].text
-                        parsed = self._parse_response(
-                            response_text,
-                            row_data.get('magid'),
-                            row_data.get('patent_id'),
-                            row_data.get('original_response')
-                        )
-                        results.append(parsed)
-                    elif result.result.type == "errored":
-                        error_msg = result.result.error.message if result.result.error else "Unknown error"
-                        results.append({
-                            "magid": row_data.get('magid'),
-                            "patent_id": row_data.get('patent_id'),
-                            "original_response": row_data.get('original_response'),
-                            "assessment": None,
-                            "error": f"API error: {error_msg}"
-                        })
-                    elif result.result.type == "expired":
-                        results.append({
-                            "magid": row_data.get('magid'),
-                            "patent_id": row_data.get('patent_id'),
-                            "original_response": row_data.get('original_response'),
-                            "assessment": None,
-                            "error": "Request expired"
-                        })
-                except Exception as e:
-                    logger.error(f"Error processing result {result.custom_id}: {str(e)}")
+                if result.result.type == "succeeded":
+                    response_text = result.result.message.content[0].text
+                    parsed = self._parse_response(
+                        response_text,
+                        row_data.get('magid'),
+                        row_data.get('patent_id'),
+                        row_data.get('original_response')
+                    )
+                    results.append(parsed)
+                elif result.result.type == "errored":
+                    error_msg = result.result.error.message if result.result.error else "Unknown error"
+                    results.append({
+                        "magid": row_data.get('magid'),
+                        "patent_id": row_data.get('patent_id'),
+                        "original_response": row_data.get('original_response'),
+                        "assessment": None,
+                        "error": f"API error: {error_msg}"
+                    })
+                elif result.result.type == "expired":
+                    results.append({
+                        "magid": row_data.get('magid'),
+                        "patent_id": row_data.get('patent_id'),
+                        "original_response": row_data.get('original_response'),
+                        "assessment": None,
+                        "error": "Request expired"
+                    })
+            except Exception as e:
+                logger.error(f"Error processing result {result.custom_id}: {str(e)}")
 
         # Write results to CSV
         if results:
