@@ -163,7 +163,7 @@ Patent Information:
         Returns list of request dicts for batch API.
         """
         logger.info(f"Loading data from {input_file}...")
-        df = pd.read_csv(input_file)
+        df = pd.read_csv(input_file, low_memory=False)
         prompt = self.load_prompt(prompt_file)
 
         if limit:
@@ -392,7 +392,7 @@ Patent Information:
         """
         start_time = time.time()
         logger.info(f"Loading data from {input_file}...")
-        df = pd.read_csv(input_file)
+        df = pd.read_csv(input_file, low_memory=False)
 
         if limit:
             df = df.iloc[:limit]
@@ -506,7 +506,7 @@ Patent Information:
         """
         start_time = time.time()
         logger.info(f"Loading data from {input_file}...")
-        df = pd.read_csv(input_file)
+        df = pd.read_csv(input_file, low_memory=False)
 
         if limit:
             df = df.iloc[:limit]
