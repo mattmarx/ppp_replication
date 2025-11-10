@@ -414,7 +414,7 @@ Patent Information:
         output_tokens = 0
 
         with open(output_file, 'w' if start_idx == 0 else 'a', newline='', encoding='utf-8') as outfile:
-            writer = csv.DictWriter(outfile, fieldnames=['magid', 'patent_id', 'original_response', 'assessment', 'error'])
+            writer = csv.DictWriter(outfile, fieldnames=['magid', 'patent_id', 'assessment'])
 
             if start_idx == 0:
                 writer.writeheader()
@@ -460,13 +460,11 @@ Patent Information:
                     response_text = response.content[0].text.strip()
                     result = self._parse_response(response_text, magid, patent_id, original_response)
 
-                    # Write result
+                    # Write result (only 3 columns)
                     output_row = {
                         'magid': result.get('magid', magid),
                         'patent_id': result.get('patent_id', patent_id),
-                        'original_response': result.get('original_response', original_response),
-                        'assessment': result.get('assessment', ''),
-                        'error': result.get('error', '')
+                        'assessment': result.get('assessment', '')
                     }
                     writer.writerow(output_row)
                     outfile.flush()
@@ -480,9 +478,7 @@ Patent Information:
                     output_row = {
                         'magid': row.get('magid', ''),
                         'patent_id': row.get('patent_id', ''),
-                        'original_response': row.get('response', ''),
-                        'assessment': '',
-                        'error': str(e)
+                        'assessment': ''
                     }
                     writer.writerow(output_row)
 
@@ -522,10 +518,16 @@ Patent Information:
         # Write results to CSV
         if results:
             with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
-                writer = csv.DictWriter(outfile, fieldnames=['magid', 'patent_id', 'original_response', 'assessment', 'error'])
+                writer = csv.DictWriter(outfile, fieldnames=['magid', 'patent_id', 'assessment'])
                 writer.writeheader()
                 for result in results:
-                    writer.writerow(result)
+                    # Only write the 3 columns we need
+                    output_row = {
+                        'magid': result.get('magid', ''),
+                        'patent_id': result.get('patent_id', ''),
+                        'assessment': result.get('assessment', '')
+                    }
+                    writer.writerow(output_row)
 
             # Calculate and report costs
             total_cost = self._calculate_cost(token_usage['input'], token_usage['output'])
