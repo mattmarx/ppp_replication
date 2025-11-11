@@ -494,20 +494,30 @@ Patent Information:
                         paper_abstract, patent_abstract, original_response
                     )
 
-                    # Call Claude API
-                    response = self.client.messages.create(
-                        model=self.model,
-                        max_tokens=500,
-                        messages=[
-                            {"role": "user", "content": message_content}
-                        ]
-                    )
-
-                    # Track token usage
-                    input_tokens += response.usage.input_tokens
-                    output_tokens += response.usage.output_tokens
-
-                    response_text = response.content[0].text.strip()
+                    # Call API (provider-specific)
+                    if self.provider == "claude":
+                        response = self.client.messages.create(
+                            model=self.model,
+                            max_tokens=500,
+                            messages=[
+                                {"role": "user", "content": message_content}
+                            ]
+                        )
+                        input_tokens += response.usage.input_tokens
+                        output_tokens += response.usage.output_tokens
+                        response_text = response.content[0].text.strip()
+                    else:  # grok
+                        response = self.client.chat.completions.create(
+                            model=self.model,
+                            max_tokens=500,
+                            messages=[
+                                {"role": "user", "content": message_content}
+                            ]
+                        )
+                        if response.usage:
+                            input_tokens += response.usage.prompt_tokens
+                            output_tokens += response.usage.completion_tokens
+                        response_text = response.choices[0].message.content.strip()
                     result = self._parse_response(response_text, magid, patent_id, original_response)
 
                     # Write result (only 3 columns)
@@ -597,7 +607,16 @@ Patent Information:
 
     async def _async_process_concurrent(self, df, prompt, start_row, max_concurrent):
         """Process rows concurrently with asyncio."""
-        async_client = AsyncAnthropic()
+        # Create async client based on provider
+        if self.provider == "claude":
+            async_client = AsyncAnthropic()
+        else:  # grok
+            from openai import AsyncOpenAI
+            async_client = AsyncOpenAI(
+                api_key=os.getenv('GROK_API_KEY'),
+                base_url="https://api.x.ai/v1"
+            )
+
         semaphore = asyncio.Semaphore(max_concurrent)
         results = []
         tasks = []
@@ -628,20 +647,30 @@ Patent Information:
                         paper_abstract, patent_abstract, original_response
                     )
 
-                    # Call Claude API asynchronously
-                    response = await async_client.messages.create(
-                        model=self.model,
-                        max_tokens=500,
-                        messages=[
-                            {"role": "user", "content": message_content}
-                        ]
-                    )
-
-                    # Track token usage
-                    token_usage['input'] += response.usage.input_tokens
-                    token_usage['output'] += response.usage.output_tokens
-
-                    response_text = response.content[0].text.strip()
+                    # Call API asynchronously (provider-specific)
+                    if self.provider == "claude":
+                        response = await async_client.messages.create(
+                            model=self.model,
+                            max_tokens=500,
+                            messages=[
+                                {"role": "user", "content": message_content}
+                            ]
+                        )
+                        token_usage['input'] += response.usage.input_tokens
+                        token_usage['output'] += response.usage.output_tokens
+                        response_text = response.content[0].text.strip()
+                    else:  # grok
+                        response = await async_client.chat.completions.create(
+                            model=self.model,
+                            max_tokens=500,
+                            messages=[
+                                {"role": "user", "content": message_content}
+                            ]
+                        )
+                        if response.usage:
+                            token_usage['input'] += response.usage.prompt_tokens
+                            token_usage['output'] += response.usage.completion_tokens
+                        response_text = response.choices[0].message.content.strip()
                     result = self._parse_response(response_text, magid, patent_id, original_response)
 
                     row_number = idx + 2  # Account for header
