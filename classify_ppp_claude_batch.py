@@ -1,22 +1,27 @@
 #!/usr/bin/env python3
 """
-Comprehensive script to classify patent-paper pairs using Claude.
-Supports batch submission, batch retrieval, and streaming modes (sequential and concurrent).
+Comprehensive script to classify patent-paper pairs using multiple LLM providers.
+Supports Claude (Anthropic) and Grok (xAI) with batch submission, retrieval, and streaming modes.
 
-Requires ANTHROPIC_API_KEY environment variable to be set.
+Environment variables:
+    ANTHROPIC_API_KEY - For Claude models
+    GROK_API_KEY - For Grok models (from xAI)
 
 Usage:
-    # Submit a batch (fastest for large datasets, but asynchronous)
+    # Submit a batch with Claude (default)
     python classify_ppp_claude_batch.py --mode batch-submit --input input.csv --prompt prompt.txt
+
+    # Submit a batch with Grok
+    python classify_ppp_claude_batch.py --mode batch-submit --input input.csv --prompt prompt.txt --provider grok
 
     # Retrieve batch results
     python classify_ppp_claude_batch.py --mode batch-retrieve --batch-id <batch_id>
 
-    # Stream results sequentially (slower)
-    python classify_ppp_claude_batch.py --mode stream --input input.csv --prompt prompt.txt
-
     # Stream results concurrently (fast and immediate feedback, recommended)
     python classify_ppp_claude_batch.py --mode stream-concurrent --input input.csv --prompt prompt.txt --max-concurrent 10
+
+    # Use specific model
+    python classify_ppp_claude_batch.py --mode stream-concurrent --input input.csv --prompt prompt.txt --model grok-3
 
     # List all tracked batches
     python classify_ppp_claude_batch.py --mode list-batches
@@ -52,22 +57,57 @@ PROMPT_FILE = 'ppp_prompt.txt'
 
 # Pricing per million tokens (update as needed)
 MODEL_PRICING = {
+    # Anthropic Claude models
     "claude-sonnet-4-5-20250929": {"input": 3.0, "output": 15.0},
+    "claude-opus-4-1": {"input": 15.0, "output": 75.0},
     "claude-3-5-sonnet-20241022": {"input": 3.0, "output": 15.0},
+    # xAI Grok models
+    "grok-3": {"input": 5.0, "output": 15.0},
+    "grok-2": {"input": 2.0, "output": 10.0},
 }
 
 class PPPBatchClassifier:
-    def __init__(self, model="claude-sonnet-4-5-20250929"):
-        """Initialize the classifier with specified model."""
-        if not os.getenv('ANTHROPIC_API_KEY'):
-            raise ValueError(
-                "ANTHROPIC_API_KEY not found. Please add it to ~/.env file with:\n"
-                "  ANTHROPIC_API_KEY=your_api_key_here\n"
-                "Or set it as an environment variable."
-            )
+    def __init__(self, model="claude-sonnet-4-5-20250929", provider="claude"):
+        """Initialize the classifier with specified model and provider.
 
-        self.client = Anthropic()
+        Args:
+            model: Model name (e.g., 'claude-sonnet-4-5-20250929' or 'grok-3')
+            provider: LLM provider ('claude' or 'grok')
+        """
+        self.provider = provider
         self.model = model
+
+        if provider == "claude":
+            if not os.getenv('ANTHROPIC_API_KEY'):
+                raise ValueError(
+                    "ANTHROPIC_API_KEY not found. Please add it to ~/.env file with:\n"
+                    "  ANTHROPIC_API_KEY=your_api_key_here\n"
+                    "Or set it as an environment variable."
+                )
+            self.client = Anthropic()
+
+        elif provider == "grok":
+            if not os.getenv('GROK_API_KEY'):
+                raise ValueError(
+                    "GROK_API_KEY not found. Please add it to ~/.env file with:\n"
+                    "  GROK_API_KEY=your_grok_api_key_here\n"
+                    "Or set it as an environment variable.\n"
+                    "Get your key from https://console.x.ai"
+                )
+            try:
+                from openai import OpenAI
+                self.client = OpenAI(
+                    api_key=os.getenv('GROK_API_KEY'),
+                    base_url="https://api.x.ai/v1"
+                )
+            except ImportError:
+                raise ImportError(
+                    "OpenAI SDK required for Grok support. Install with:\n"
+                    "  pip install openai"
+                )
+        else:
+            raise ValueError(f"Unsupported provider: {provider}. Use 'claude' or 'grok'")
+
         self.batch_tracking = self._load_batch_tracking()
 
     def _calculate_cost(self, input_tokens, output_tokens):
@@ -124,7 +164,14 @@ Patent Information:
             end_idx = response_text.rfind('}') + 1
             if start_idx != -1 and end_idx > start_idx:
                 json_str = response_text[start_idx:end_idx]
-                result = json.loads(json_str)
+                parsed_json = json.loads(json_str)
+                # Always include magid and patent_id in the result
+                result = {
+                    "magid": magid,
+                    "patent_id": patent_id,
+                }
+                # Add the parsed assessment and any other fields from Claude
+                result.update(parsed_json)
                 return result
             else:
                 # Fallback: try to extract just the assessment (A/B/C/D)
@@ -356,6 +403,9 @@ Patent Information:
         # Write results to CSV
         if results:
             df_results = pd.DataFrame(results)
+            # Only keep the columns we need
+            columns_to_keep = ['magid', 'patent_id', 'assessment']
+            df_results = df_results[[col for col in columns_to_keep if col in df_results.columns]]
             df_results.to_csv(output_file, index=False)
             logger.info(f"Results saved to {output_file}")
             logger.info(f"Total results: {len(results)}")
@@ -600,18 +650,14 @@ Patent Information:
                     return {
                         'magid': result.get('magid', magid),
                         'patent_id': result.get('patent_id', patent_id),
-                        'original_response': result.get('original_response', original_response),
-                        'assessment': result.get('assessment', ''),
-                        'error': result.get('error', '')
+                        'assessment': result.get('assessment', '')
                     }
                 except Exception as e:
                     logger.error(f"Error processing row {idx}: {str(e)}")
                     return {
                         'magid': row.get('magid', ''),
                         'patent_id': row.get('patent_id', ''),
-                        'original_response': row.get('response', ''),
-                        'assessment': '',
-                        'error': str(e)
+                        'assessment': ''
                     }
 
         # Create tasks for all rows
@@ -654,23 +700,30 @@ Patent Information:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Classify patent-paper pairs using Claude with batch/stream modes'
+        description='Classify patent-paper pairs using Claude or Grok with batch/stream modes'
     )
     parser.add_argument('--mode', choices=['batch-submit', 'batch-retrieve', 'stream', 'stream-concurrent', 'list-batches'],
                        default='batch-submit', help='Mode of operation')
+    parser.add_argument('--provider', choices=['claude', 'grok'], default='claude',
+                       help='LLM provider (claude or grok, default: claude)')
     parser.add_argument('--input', help='Input CSV file')
     parser.add_argument('--prompt', default='ppp_prompt.txt', help='Prompt file')
     parser.add_argument('--output', help='Output CSV file')
     parser.add_argument('--batch-id', help='Batch ID for retrieval')
-    parser.add_argument('--model', default='claude-sonnet-4-5-20250929', help='Claude model to use')
+    parser.add_argument('--model', default='claude-sonnet-4-5-20250929',
+                       help='Model to use (default: claude-sonnet-4-5-20250929 for Claude, grok-3 for Grok)')
     parser.add_argument('--start-row', type=int, default=0, help='Start from this row (0-indexed)')
     parser.add_argument('--limit', type=int, help='Limit number of rows to process')
     parser.add_argument('--max-concurrent', type=int, default=5, help='Maximum concurrent requests (default: 5)')
 
     args = parser.parse_args()
 
+    # Set default model based on provider if not overridden
+    if args.model == 'claude-sonnet-4-5-20250929' and args.provider == 'grok':
+        args.model = 'grok-3'
+
     try:
-        classifier = PPPBatchClassifier(model=args.model)
+        classifier = PPPBatchClassifier(model=args.model, provider=args.provider)
 
         if args.mode == 'batch-submit':
             if not args.input:
