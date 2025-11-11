@@ -61,9 +61,9 @@ MODEL_PRICING = {
     "claude-sonnet-4-5-20250929": {"input": 3.0, "output": 15.0},
     "claude-opus-4-1": {"input": 15.0, "output": 75.0},
     "claude-3-5-sonnet-20241022": {"input": 3.0, "output": 15.0},
-    # xAI Grok models
-    "grok-3": {"input": 5.0, "output": 15.0},
-    "grok-2": {"input": 2.0, "output": 10.0},
+    # xAI Grok models (2M token context window)
+    "grok-4-fast-reasoning": {"input": 5.0, "output": 15.0},
+    "grok-4-fast-non-reasoning": {"input": 5.0, "output": 15.0},
 }
 
 class PPPBatchClassifier:
@@ -711,7 +711,7 @@ def main():
     parser.add_argument('--output', help='Output CSV file')
     parser.add_argument('--batch-id', help='Batch ID for retrieval')
     parser.add_argument('--model', default='claude-sonnet-4-5-20250929',
-                       help='Model to use (default: claude-sonnet-4-5-20250929 for Claude, grok-3 for Grok)')
+                       help='Model to use (default: claude-sonnet-4-5-20250929 for Claude, grok-4-fast-non-reasoning for Grok)')
     parser.add_argument('--start-row', type=int, default=0, help='Start from this row (0-indexed)')
     parser.add_argument('--limit', type=int, help='Limit number of rows to process')
     parser.add_argument('--max-concurrent', type=int, default=5, help='Maximum concurrent requests (default: 5)')
@@ -720,7 +720,7 @@ def main():
 
     # Set default model based on provider if not overridden
     if args.model == 'claude-sonnet-4-5-20250929' and args.provider == 'grok':
-        args.model = 'grok-3'
+        args.model = 'grok-4-fast-non-reasoning'
 
     try:
         classifier = PPPBatchClassifier(model=args.model, provider=args.provider)
