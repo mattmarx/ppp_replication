@@ -581,10 +581,10 @@ Patent Information:
         print(f"  Processing time: {elapsed_time:.2f}s")
         return output_file
 
-    def stream_classify_concurrent(self, input_file, prompt_file, output_file=None, start_row=0, limit=None, max_concurrent=5):
+    def stream_classify_concurrent(self, input_file, prompt_file, output_file=None, start_row=0, limit=None, max_concurrent=5, checkpoint_interval=1000):
         """
-        Classify pairs using concurrent streaming mode.
-        Processes multiple requests in parallel for faster throughput.
+        Classify pairs using concurrent streaming mode with incremental checkpointing.
+        Processes multiple requests in parallel and saves results every checkpoint_interval pairs.
         """
         start_time = time.time()
         logger.info(f"Loading data from {input_file}...")
@@ -598,30 +598,21 @@ Patent Information:
 
         prompt = self.load_prompt(prompt_file)
 
-        # Run async processing
-        results, token_usage = asyncio.run(self._async_process_concurrent(df, prompt, start_row, max_concurrent))
+        logger.info(f"Starting concurrent processing with checkpoints every {checkpoint_interval} pairs...")
 
-        # Write results to CSV
-        if results:
-            with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
-                writer = csv.DictWriter(outfile, fieldnames=['magid', 'patent_id', 'assessment'])
-                writer.writeheader()
-                for result in results:
-                    # Only write the 3 columns we need
-                    output_row = {
-                        'magid': result.get('magid', ''),
-                        'patent_id': result.get('patent_id', ''),
-                        'assessment': result.get('assessment', '')
-                    }
-                    writer.writerow(output_row)
+        # Run async processing with checkpoint callback
+        results, token_usage = asyncio.run(self._async_process_concurrent_with_checkpoints(
+            df, prompt, start_row, max_concurrent, output_file, checkpoint_interval
+        ))
 
-            # Calculate and report costs
+        # Final summary report
+        if results is not None:
             total_cost = self._calculate_cost(token_usage['input'], token_usage['output'])
             elapsed_time = time.time() - start_time
 
-            logger.info(f"Done! Processed {len(results)} pairs. Results saved to {output_file}")
+            logger.info(f"Done! Processed {results} pairs. Results saved to {output_file}")
             print(f"\n✓ Classification complete: {output_file}")
-            print(f"  Total results: {len(results)}")
+            print(f"  Total results: {results}")
             print(f"  Input tokens: {token_usage['input']:,}")
             print(f"  Output tokens: {token_usage['output']:,}")
             print(f"  Total cost: ${total_cost:.4f}")
@@ -736,6 +727,134 @@ Patent Information:
 
         return results, token_usage
 
+    async def _async_process_concurrent_with_checkpoints(self, df, prompt, start_row, max_concurrent, output_file, checkpoint_interval):
+        """Process rows concurrently with incremental checkpointing."""
+        # Create async client based on provider
+        if self.provider == "claude":
+            async_client = AsyncAnthropic()
+        elif self.provider == "grok":
+            from openai import AsyncOpenAI
+            async_client = AsyncOpenAI(
+                api_key=os.getenv('GROK_API_KEY'),
+                base_url="https://api.x.ai/v1"
+            )
+        elif self.provider == "kimi":
+            from openai import AsyncOpenAI
+            async_client = AsyncOpenAI(
+                api_key=os.getenv('MOONSHOT_API_KEY'),
+                base_url="https://api.moonshot.ai/v1"
+            )
+        else:
+            raise ValueError(f"Unsupported provider: {self.provider}")
+
+        semaphore = asyncio.Semaphore(max_concurrent)
+        token_usage = {'input': 0, 'output': 0}
+        processed_count = 0
+
+        # Initialize output file with header
+        with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+            writer = csv.DictWriter(outfile, fieldnames=['magid', 'patent_id', 'assessment'])
+            writer.writeheader()
+
+        logger.info(f"Starting concurrent processing with checkpoints every {checkpoint_interval} pairs...")
+
+        async def process_row(idx, row):
+            """Process a single row with semaphore limiting."""
+            async with semaphore:
+                try:
+                    magid = int(row['magid'])
+                    try:
+                        patent_id = int(row['patent_id'])
+                    except (ValueError, TypeError):
+                        patent_id = row['patent_id']
+                    papertitle = str(row['papertitle'])
+                    patent_title = str(row['patent_title'])
+                    paper_abstract = str(row['paper_abstract'])
+                    patent_abstract = str(row['patent_abstract'])
+                    original_response = str(row.get('response', ''))
+
+                    message_content = self._build_message_content(
+                        prompt, magid, patent_id, papertitle, patent_title,
+                        paper_abstract, patent_abstract, original_response
+                    )
+
+                    # Call API asynchronously (provider-specific)
+                    if self.provider == "claude":
+                        response = await async_client.messages.create(
+                            model=self.model,
+                            max_tokens=500,
+                            messages=[
+                                {"role": "user", "content": message_content}
+                            ]
+                        )
+                        token_usage['input'] += response.usage.input_tokens
+                        token_usage['output'] += response.usage.output_tokens
+                        response_text = response.content[0].text.strip()
+                    else:  # grok or kimi (both use OpenAI-compatible API)
+                        response = await async_client.chat.completions.create(
+                            model=self.model,
+                            max_tokens=500,
+                            messages=[
+                                {"role": "user", "content": message_content}
+                            ]
+                        )
+                        if response.usage:
+                            token_usage['input'] += response.usage.prompt_tokens
+                            token_usage['output'] += response.usage.completion_tokens
+                        response_text = response.choices[0].message.content.strip()
+
+                    result = self._parse_response(response_text, magid, patent_id, original_response)
+                    row_number = idx + 2  # Account for header
+                    logger.info(f"Completed row {row_number}/{len(df)} (magid: {magid}, patent_id: {patent_id})")
+
+                    return {
+                        'magid': result.get('magid', magid),
+                        'patent_id': result.get('patent_id', patent_id),
+                        'assessment': result.get('assessment', '')
+                    }
+                except Exception as e:
+                    logger.error(f"Error processing row {idx}: {str(e)}")
+                    return {
+                        'magid': row.get('magid', ''),
+                        'patent_id': row.get('patent_id', ''),
+                        'assessment': ''
+                    }
+
+        # Process rows in batches
+        batch_results = []
+        for idx, row in df.iterrows():
+            if idx < start_row:
+                continue
+
+            # Create task for this row
+            task = process_row(idx, row)
+            batch_results.append(asyncio.create_task(task))
+
+            # If batch is full or we're at the end, process the batch and save checkpoint
+            if len(batch_results) >= checkpoint_interval or idx == len(df) - 1:
+                logger.info(f"Processing batch with {len(batch_results)} results...")
+                results = await asyncio.gather(*batch_results)
+
+                # Write batch results to CSV (append mode)
+                with open(output_file, 'a', newline='', encoding='utf-8') as outfile:
+                    writer = csv.DictWriter(outfile, fieldnames=['magid', 'patent_id', 'assessment'])
+                    for result in results:
+                        output_row = {
+                            'magid': result.get('magid', ''),
+                            'patent_id': result.get('patent_id', ''),
+                            'assessment': result.get('assessment', '')
+                        }
+                        writer.writerow(output_row)
+
+                processed_count += len(results)
+                checkpoint_num = processed_count // checkpoint_interval
+                logger.info(f"✓ Checkpoint {checkpoint_num}: Saved {processed_count} total results to {output_file}")
+                print(f"✓ Checkpoint: Processed {processed_count} pairs so far (cost so far: ${self._calculate_cost(token_usage['input'], token_usage['output']):.4f})")
+
+                batch_results = []
+
+        return processed_count, token_usage
+
     def list_batches(self):
         """List all tracked batches."""
         if not self.batch_tracking['batches']:
@@ -778,6 +897,7 @@ def main():
     parser.add_argument('--start-row', type=int, default=0, help='Start from this row (0-indexed)')
     parser.add_argument('--limit', type=int, help='Limit number of rows to process')
     parser.add_argument('--max-concurrent', type=int, default=5, help='Maximum concurrent requests (default: 5)')
+    parser.add_argument('--checkpoint-interval', type=int, default=1000, help='Save checkpoint every N pairs (default: 1000)')
 
     args = parser.parse_args()
 
@@ -813,7 +933,7 @@ def main():
             if not args.input:
                 print("Error: --input required for stream-concurrent mode", file=sys.stderr)
                 sys.exit(1)
-            classifier.stream_classify_concurrent(args.input, args.prompt, args.output, args.start_row, args.limit, args.max_concurrent)
+            classifier.stream_classify_concurrent(args.input, args.prompt, args.output, args.start_row, args.limit, args.max_concurrent, args.checkpoint_interval)
 
         elif args.mode == 'list-batches':
             classifier.list_batches()
