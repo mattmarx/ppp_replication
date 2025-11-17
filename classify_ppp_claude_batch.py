@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
 Comprehensive script to classify patent-paper pairs using multiple LLM providers.
-Supports Claude (Anthropic) and Grok (xAI) with batch submission, retrieval, and streaming modes.
+Supports Claude (Anthropic), Grok (xAI), and Kimi K2 (Moonshot) with batch submission, retrieval, and streaming modes.
 
 Environment variables:
     ANTHROPIC_API_KEY - For Claude models
     GROK_API_KEY - For Grok models (from xAI)
+    MOONSHOT_API_KEY - For Kimi K2 models (from Moonshot)
 
 Usage:
     # Submit a batch with Claude (default)
@@ -14,6 +15,9 @@ Usage:
     # Submit a batch with Grok
     python classify_ppp_claude_batch.py --mode batch-submit --input input.csv --prompt prompt.txt --provider grok
 
+    # Submit a batch with Kimi K2
+    python classify_ppp_claude_batch.py --mode batch-submit --input input.csv --prompt prompt.txt --provider kimi --model kimi-k2
+
     # Retrieve batch results
     python classify_ppp_claude_batch.py --mode batch-retrieve --batch-id <batch_id>
 
@@ -21,7 +25,7 @@ Usage:
     python classify_ppp_claude_batch.py --mode stream-concurrent --input input.csv --prompt prompt.txt --max-concurrent 10
 
     # Use specific model
-    python classify_ppp_claude_batch.py --mode stream-concurrent --input input.csv --prompt prompt.txt --model grok-3
+    python classify_ppp_claude_batch.py --mode stream-concurrent --input input.csv --prompt prompt.txt --provider kimi --model kimi-k2
 
     # List all tracked batches
     python classify_ppp_claude_batch.py --mode list-batches
@@ -62,8 +66,11 @@ MODEL_PRICING = {
     "claude-opus-4-1": {"input": 15.0, "output": 75.0},
     "claude-3-5-sonnet-20241022": {"input": 3.0, "output": 15.0},
     # xAI Grok models (2M token context window)
+    "grok-4": {"input": 3.0, "output": 9.0},
     "grok-4-fast-reasoning": {"input": 5.0, "output": 15.0},
     "grok-4-fast-non-reasoning": {"input": 5.0, "output": 15.0},
+    # Moonshot Kimi K2 models
+    "kimi-k2": {"input": 0.15, "output": 0.45},
 }
 
 class PPPBatchClassifier:
@@ -105,8 +112,27 @@ class PPPBatchClassifier:
                     "OpenAI SDK required for Grok support. Install with:\n"
                     "  pip install openai"
                 )
+        elif provider == "kimi":
+            if not os.getenv('MOONSHOT_API_KEY'):
+                raise ValueError(
+                    "MOONSHOT_API_KEY not found. Please add it to ~/.env file with:\n"
+                    "  MOONSHOT_API_KEY=your_moonshot_api_key_here\n"
+                    "Or set it as an environment variable.\n"
+                    "Get your key from https://platform.moonshot.ai"
+                )
+            try:
+                from openai import OpenAI
+                self.client = OpenAI(
+                    api_key=os.getenv('MOONSHOT_API_KEY'),
+                    base_url="https://api.moonshot.ai/v1"
+                )
+            except ImportError:
+                raise ImportError(
+                    "OpenAI SDK required for Kimi K2 support. Install with:\n"
+                    "  pip install openai"
+                )
         else:
-            raise ValueError(f"Unsupported provider: {provider}. Use 'claude' or 'grok'")
+            raise ValueError(f"Unsupported provider: {provider}. Use 'claude', 'grok', or 'kimi'")
 
         self.batch_tracking = self._load_batch_tracking()
 
@@ -506,7 +532,7 @@ Patent Information:
                         input_tokens += response.usage.input_tokens
                         output_tokens += response.usage.output_tokens
                         response_text = response.content[0].text.strip()
-                    else:  # grok
+                    else:  # grok or kimi (both use OpenAI-compatible API)
                         response = self.client.chat.completions.create(
                             model=self.model,
                             max_tokens=500,
@@ -610,12 +636,20 @@ Patent Information:
         # Create async client based on provider
         if self.provider == "claude":
             async_client = AsyncAnthropic()
-        else:  # grok
+        elif self.provider == "grok":
             from openai import AsyncOpenAI
             async_client = AsyncOpenAI(
                 api_key=os.getenv('GROK_API_KEY'),
                 base_url="https://api.x.ai/v1"
             )
+        elif self.provider == "kimi":
+            from openai import AsyncOpenAI
+            async_client = AsyncOpenAI(
+                api_key=os.getenv('MOONSHOT_API_KEY'),
+                base_url="https://api.moonshot.ai/v1"
+            )
+        else:
+            raise ValueError(f"Unsupported provider: {self.provider}")
 
         semaphore = asyncio.Semaphore(max_concurrent)
         results = []
@@ -659,7 +693,7 @@ Patent Information:
                         token_usage['input'] += response.usage.input_tokens
                         token_usage['output'] += response.usage.output_tokens
                         response_text = response.content[0].text.strip()
-                    else:  # grok
+                    else:  # grok or kimi (both use OpenAI-compatible API)
                         response = await async_client.chat.completions.create(
                             model=self.model,
                             max_tokens=500,
@@ -729,12 +763,12 @@ Patent Information:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Classify patent-paper pairs using Claude or Grok with batch/stream modes'
+        description='Classify patent-paper pairs using Claude, Grok, or Kimi K2 with batch/stream modes'
     )
     parser.add_argument('--mode', choices=['batch-submit', 'batch-retrieve', 'stream', 'stream-concurrent', 'list-batches'],
                        default='batch-submit', help='Mode of operation')
-    parser.add_argument('--provider', choices=['claude', 'grok'], default='claude',
-                       help='LLM provider (claude or grok, default: claude)')
+    parser.add_argument('--provider', choices=['claude', 'grok', 'kimi'], default='claude',
+                       help='LLM provider (claude, grok, or kimi, default: claude)')
     parser.add_argument('--input', help='Input CSV file')
     parser.add_argument('--prompt', default='ppp_prompt.txt', help='Prompt file')
     parser.add_argument('--output', help='Output CSV file')
@@ -748,8 +782,11 @@ def main():
     args = parser.parse_args()
 
     # Set default model based on provider if not overridden
-    if args.model == 'claude-sonnet-4-5-20250929' and args.provider == 'grok':
-        args.model = 'grok-4-fast-non-reasoning'
+    if args.model == 'claude-sonnet-4-5-20250929':
+        if args.provider == 'grok':
+            args.model = 'grok-4-fast-non-reasoning'
+        elif args.provider == 'kimi':
+            args.model = 'kimi-k2'
 
     try:
         classifier = PPPBatchClassifier(model=args.model, provider=args.provider)
