@@ -849,7 +849,7 @@ Patent Information:
                 processed_count += len(results)
                 checkpoint_num = processed_count // checkpoint_interval
                 logger.info(f"✓ Checkpoint {checkpoint_num}: Saved {processed_count} total results to {output_file}")
-                print(f"✓ Checkpoint: Processed {processed_count} pairs so far (cost so far: ${self._calculate_cost(token_usage['input'], token_usage['output']):.4f})")
+                print(f"✓ Checkpoint: Processed {processed_count} pairs so far")
 
                 batch_results = []
 

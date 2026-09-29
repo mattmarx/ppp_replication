@@ -1,0 +1,5 @@
+# Where the bulk (downloaded) data files live — outside this folder, so they are
+# never synced by Dropbox and never enter the replication archive.
+# Written in the form the notebook Python understands (Windows drive path here).
+# Overridden by the PPP_BULK_DIR environment variable.
+D:/ppp_files

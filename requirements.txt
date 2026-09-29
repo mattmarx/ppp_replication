@@ -1,0 +1,103 @@
+# Notebook-pipeline environment (Python 3.13 on Windows; reconstructed from .venv package metadata).
+# The LLM batch classifier (classify_ppp_claude_batch.py) uses the smaller requirements_wsl_batch_env.txt (Python 3.12).
+accelerate==1.12.0
+adapters==1.2.0
+appdirs==1.4.4
+astor==0.8.1
+asttokens==3.0.0
+certifi==2025.11.12
+charset-normalizer==3.4.4
+click==8.3.1
+colorama==0.4.6
+comm==0.2.3
+contourpy==1.3.2
+cycler==0.12.1
+debugpy==1.8.18
+decorator==5.2.1
+executing==2.2.0
+filelock==3.20.0
+fonttools==4.58.4
+fsspec==2025.12.0
+huggingface-hub==0.36.0
+idna==3.11
+ipykernel==7.1.0
+ipython-pygments-lexers==1.1.1
+ipython==9.3.0
+jedi==0.19.2
+jinja2==3.1.6
+joblib==1.5.3
+jupyter-client==8.7.0
+jupyter-core==5.9.1
+kiwisolver==1.4.8
+nbconvert>=7.16  # headless notebook execution (run_pipeline.sh)
+markupsafe==3.0.3
+matplotlib-inline==0.1.7
+matplotlib==3.10.3
+mpmath==1.3.0
+narwhals==1.43.1
+nest-asyncio==1.6.0
+networkx==3.6.1
+nltk==3.9.2
+numpy==2.3.0
+packaging==25.0
+pandas==2.3.0
+pandasgui==0.2.15
+parso==0.8.4
+patsy==1.0.2
+peft==0.15.2  # 0.18 requires transformers>=4.53 and breaks sentence-transformers against the transformers pin below
+pillow==11.2.1
+pip==25.3
+platformdirs==4.5.1
+plotly==6.1.2
+prompt-toolkit==3.0.51
+psutil==7.1.3
+pure-eval==0.2.3
+pyarrow==20.0.0
+pygments==2.19.1
+pynput==1.8.1
+pyparsing==3.2.3
+PyQt5-Qt5==5.15.2
+PyQt5-sip==12.17.0
+PyQt5==5.15.11
+PyQtWebEngine-Qt5==5.15.2
+PyQtWebEngine==5.15.7
+python-dateutil==2.9.0.post0
+pytz==2025.2
+pywin32==310
+pyyaml==6.0.3
+pyzmq==27.1.0
+qtstylish==0.1.5
+regex==2025.11.3
+requests==2.32.5
+safetensors==0.7.0
+scikit-learn==1.8.0
+scipy==1.16.3
+seaborn==0.13.2
+sentence-transformers==5.2.0
+setuptools==80.9.0
+six==1.17.0
+stack-data==0.6.3
+statsmodels==0.14.6
+sympy==1.14.0
+threadpoolctl==3.6.0
+tokenizers==0.21.4
+# NOTE: on Windows, plain PyPI installs the CPU-only torch wheel. For GPU, reinstall after:
+#   pip install --force-reinstall torch==2.9.1 --index-url https://download.pytorch.org/whl/cu126
+torch==2.9.1
+tornado==6.5.3
+tqdm==4.67.1
+traitlets==5.14.3
+transformers==4.51.3
+typing-extensions==4.14.0
+tzdata==2025.2
+urllib3==2.6.2
+wcwidth==0.2.13
+wordcloud==1.9.4
+
+# --- Added 2026-07-08: used by the notebooks but missed by the dist-info reconstruction
+diff-match-patch>=20200713  # compute_plagiarism_metrics001.py (self-plagiarism stage)
+fuzzywuzzy==0.18.0
+Metaphone==0.6
+ollama>=0.4
+rapidfuzz>=3.9
+python-Levenshtein>=0.25  # optional fuzzywuzzy speedup (silences its slow-mode warning)

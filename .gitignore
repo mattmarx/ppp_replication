@@ -1,0 +1,24 @@
+# Confidential inputs (WoS extracts, author-validation responses) — never commit
+data/conf/
+
+# Regenerable pipeline outputs and intermediates
+data/int/
+data/fin/
+data/bulk/
+data/byhandraw/
+data/raw/chunk_*
+paperencodings/
+patencodings/
+output/
+logs/
+*.log
+
+# Environments / caches / scratch
+.venv313/
+venv/
+wslvenv/
+__pycache__/
+.ipynb_checkpoints/
+ARCHIVE/
+batch_tracking.json
+data/raw/patent_families.tsv
