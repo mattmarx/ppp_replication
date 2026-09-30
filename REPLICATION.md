@@ -126,7 +126,7 @@ Two provenance classes:
 
 1. **Re-downloadable** (the bulk directory): the MAG-derived bulk files, the
    PatentsView `g_*.tsv.zip` files and the PQR files come from public Zenodo records
-   (4845629, 14170964, 11461587, 3936556, 11374125, 15783125);
+   (4845629, 14170964, 11461587, 3936556, 11374125, 15783125, 23048170);
    `downloadFiles002.ipynb` fetches them if ever needed.
 2. **Disk-only masters** (everything else): the PatentsView `g_*.tsv.zip` bulk files
    (PatentsView has migrated its download site), all hand-coded validation files, the

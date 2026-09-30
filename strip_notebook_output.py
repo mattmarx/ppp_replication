@@ -13,4 +13,5 @@ for cell in nb.get("cells", []):
     if cell.get("cell_type") == "code":
         cell["outputs"] = []
         cell["execution_count"] = None
+        cell.get("metadata", {}).pop("execution", None)
 sys.stdout.buffer.write((json.dumps(nb, indent=1, ensure_ascii=False) + "\n").encode("utf-8"))

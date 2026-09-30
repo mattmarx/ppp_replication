@@ -44,7 +44,7 @@ done
 
 # The Zenodo-refetchable bulk files (~79 GB) live outside this package; a --full
 # build appends them as data/bulk/. downloadFiles002.ipynb re-fetches them otherwise
-# (records 3936556, 4845629, 11374125, 11461587, 14170964, 15783125).
+# (records 3936556, 4845629, 11374125, 11461587, 14170964, 15783125, 23048170).
 . ./bulk_dir.sh
 
 STAMP=$(date +%Y%m%d)

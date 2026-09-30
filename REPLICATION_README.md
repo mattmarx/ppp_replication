@@ -33,7 +33,8 @@ re-downloaded was moved out of it into the bulk directory on 2026-09-04;
 | 14170964 | `paperdates.zip`, `paperdoi.zip` |
 | 11461587 | `_pcs_oa.csv` |
 | 3936556 | `PaperAbstracts.nt.bz2` (41 GB) |
-| 11374125 | PQR files: `pqrs_dataset.tsv`, `pqrs_authorid_workid.tsv`, `inventorid_patentid.tsv` |
+| 11374125 | PQR files: `pqrs_dataset.tsv`, `inventorid_patentid.tsv` |
+| 23048170 | `pqrs_authorid_workid.tsv` |
 | 15783125 | The 10 granted PatentsView files: `g_application`, `g_patent`, `g_patent_abstract`, `g_cpc_at_issue`, `g_us_rel_doc`, `g_assignee_disambiguated`, `g_inventor_disambiguated`, `g_gov_interest{,_contracts,_org}` (`.tsv.zip`) |
 
 All of the above live in the **bulk directory**, not in `data/raw`. Note on the
@@ -97,7 +98,7 @@ Standalone tools:
 
 ## External services required at run time
 
-1. **Zenodo** — `downloadFiles002.ipynb` fetches from records 3936556, 4845629, 11374125, 11461587, 14170964, 15783125 into the bulk directory.
+1. **Zenodo** — `downloadFiles002.ipynb` fetches from records 3936556, 4845629, 11374125, 11461587, 14170964, 15783125, 23048170 into the bulk directory.
 2. **Hugging Face** — sentence-transformer models are downloaded on first use.
 3. **LLM APIs** (only for the classification step): `ANTHROPIC_API_KEY`, `GROK_API_KEY`,
    `MOONSHOT_API_KEY` read from `~/.env`.
